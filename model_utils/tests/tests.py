@@ -1,12 +1,14 @@
+from datetime import datetime, timedelta
+
 from django.test import TestCase
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.fields import FieldDoesNotExist
 
-from model_utils import ChoiceEnum
+from model_utils import ChoiceEnum, Choices
 from model_utils.fields import get_excerpt
 from model_utils.tests.models import InheritParent, InheritChild, TimeStamp, \
-    Post, Article
+    Post, Article, Status, Status2, TimeFrame
 
 
 class GetExcerptTests(TestCase):
@@ -100,6 +102,40 @@ class LabelChoiceEnumTests(ChoiceEnumTests):
         self.assertEquals(tuple(self.STATUS), ((0, 'draft'), (1, 'published'), (2, 'DELETED')))
 
 
+class ChoicesTests(TestCase):
+    def setUp(self):
+        self.STATUS = Choices('DRAFT', 'PUBLISHED')
+
+    def test_getattr(self):
+        self.assertEquals(self.STATUS.draft, 'DRAFT')
+
+    def test_getitem(self):
+        self.assertEquals(self.STATUS[1], 'PUBLISHED')
+
+    def test_iteration(self):
+        self.assertEquals(tuple(self.STATUS), (('DRAFT', 'DRAFT'), ('PUBLISHED', 'PUBLISHED')))
+
+    def test_display(self):
+        self.assertEquals(self.STATUS.draft, 'DRAFT')
+
+class LabelChoicesTests(ChoicesTests):
+    def setUp(self):
+        self.STATUS = Choices(
+            ('DRAFT', 'draft'),
+            ('PUBLISHED', 'published'),
+            'DELETED',
+        )
+
+    def test_iteration(self):
+        self.assertEquals(tuple(self.STATUS), (
+            ('DRAFT', 'draft'),
+            ('PUBLISHED', 'published'),
+            ('DELETED', 'DELETED'))
+        )
+
+    def test_display(self):
+        self.assertEquals(self.STATUS.deleted, 'DELETED')
+
 class InheritanceCastModelTests(TestCase):
     def setUp(self):
         self.parent = InheritParent.objects.create()
@@ -129,6 +165,84 @@ class TimeStampedModelTests(TestCase):
         t2 = TimeStamp.objects.create()
         t1.save()
         self.assert_(t2.modified < t1.modified)
+
+
+class TimeFramedModelTests(TestCase):
+
+    def testCreated(self):
+        now = datetime.now()
+        # objects are out of the timeframe
+        TimeFrame.objects.create(start=now+timedelta(days=2))
+        TimeFrame.objects.create(end=now-timedelta(days=1))
+        self.assertEquals(TimeFrame.timeframed.count(), 0)
+
+        # objects in the timeframe for various reasons
+        TimeFrame.objects.create(start=now-timedelta(days=10))
+        TimeFrame.objects.create(end=now+timedelta(days=2))
+        TimeFrame.objects.create(start=now-timedelta(days=1), end=now+timedelta(days=1))
+        self.assertEquals(TimeFrame.timeframed.count(), 3)
+
+
+class StatusModelTests(TestCase):
+    def setUp(self):
+        self.model = Status
+
+    def testCreated(self):
+        c1 = self.model.objects.create()
+        c2 = self.model.objects.create()
+        self.assert_(c2.status_date > c1.status_date)
+        self.assertEquals(self.model.active.count(), 2)
+        self.assertEquals(self.model.deleted.count(), 0)
+
+    def testModification(self):
+        t1 = self.model.objects.create()
+        date_created = t1.status_date
+        t1.status = t1.STATUS.on_hold
+        t1.save()
+        self.assertEquals(self.model.active.count(), 0)
+        self.assertEquals(self.model.on_hold.count(), 1)
+        self.assert_(t1.status_date > date_created)
+        date_changed = t1.status_date
+        t1.save()
+        self.assertEquals(t1.status_date, date_changed)
+        date_active_again = t1.status_date
+        t1.status = t1.STATUS.active
+        t1.save()
+        self.assert_(t1.status_date > date_active_again)
+
+    def testPreviousConditon(self):
+        status = self.model.objects.create()
+        self.assertEquals(status.previous_status, None)
+        status.status = status.STATUS.on_hold
+        status.save()
+        self.assertEquals(status.previous_status, status.STATUS.active)
+
+class Status2ModelTests(StatusModelTests):
+    def setUp(self):
+        self.model = Status2
+
+    def testModification(self):
+        t1 = self.model.objects.create()
+        date_created = t1.status_date
+        t1.status = t1.STATUS[2][0] # boring on_hold status
+        t1.save()
+        self.assertEquals(self.model.active.count(), 0)
+        self.assertEquals(self.model.on_hold.count(), 1)
+        self.assert_(t1.status_date > date_created)
+        date_changed = t1.status_date
+        t1.save()
+        self.assertEquals(t1.status_date, date_changed)
+        date_active_again = t1.status_date
+        t1.status = t1.STATUS[0][0] # boring active status
+        t1.save()
+        self.assert_(t1.status_date > date_active_again)
+
+    def testPreviousConditon(self):
+        status = self.model.objects.create()
+        self.assertEquals(status.previous_status, None)
+        status.status = status.STATUS[2][0]
+        status.save()
+        self.assertEquals(status.previous_status, status.STATUS[0][0])
 
 class QueryManagerTests(TestCase):
     def setUp(self):
