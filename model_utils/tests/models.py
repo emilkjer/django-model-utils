@@ -7,21 +7,35 @@ from model_utils.fields import SplitField, MonitorField
 from model_utils import Choices
 
 class InheritParent(InheritanceCastModel):
+    non_related_field_using_descriptor = models.FileField(upload_to='test')
+    normal_field = models.TextField()
     pass
 
 class InheritChild(InheritParent):
+    non_related_field_using_descriptor_2 = models.FileField(upload_to='test')
+    normal_field_2 = models.TextField()
     pass
 
 class InheritChild2(InheritParent):
+    non_related_field_using_descriptor_3 = models.FileField(upload_to='test')
+    normal_field_3 = models.TextField()
     pass
 
 class InheritanceManagerTestParent(models.Model):
+    # test for #6
+    # I'm using FileField, because it will always use descriptor
+    non_related_field_using_descriptor = models.FileField(upload_to='test')
+    normal_field = models.TextField()
     objects = InheritanceManager()
 
 class InheritanceManagerTestChild1(InheritanceManagerTestParent):
+    non_related_field_using_descriptor_2 = models.FileField(upload_to='test')
+    normal_field_2 = models.TextField()
     pass
 
 class InheritanceManagerTestChild2(InheritanceManagerTestParent):
+    non_related_field_using_descriptor_2 = models.FileField(upload_to='test')
+    normal_field_2 = models.TextField()
     pass
 
 class TimeStamp(TimeStampedModel):
@@ -109,7 +123,7 @@ class Entry(models.Model):
     author = models.CharField(max_length=20)
     published = models.BooleanField()
     feature = models.BooleanField(default=False)
-    
+
     objects = manager_from(AuthorMixin, PublishedMixin, unpublished)
     broken = manager_from(PublishedMixin, manager_cls=FeaturedManager)
     featured = manager_from(PublishedMixin,
@@ -119,20 +133,20 @@ class Entry(models.Model):
 class DudeQuerySet(models.query.QuerySet):
     def abiding(self):
         return self.filter(abides=True)
-    
+
     def rug_positive(self):
         return self.filter(has_rug=True)
-    
+
     def rug_negative(self):
         return self.filter(has_rug=False)
-    
+
     def by_name(self, name):
         return self.filter(name__iexact=name)
 
 class AbidingManager(PassThroughManager):
     def get_query_set(self):
         return DudeQuerySet(self.model).abiding()
-    
+
     def get_stats(self):
         return {
             'abiding_count': self.count(),
@@ -143,6 +157,6 @@ class Dude(models.Model):
     abides = models.BooleanField(default=True)
     name = models.CharField(max_length=20)
     has_rug = models.BooleanField()
-    
+
     objects = PassThroughManager(DudeQuerySet)
     abiders = AbidingManager()

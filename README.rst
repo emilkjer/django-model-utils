@@ -397,7 +397,7 @@ PassThroughManager
 
 The ``PassThroughManager`` class (`contributed by Paul McLanahan`_) solves
 the same problem as the above ``manager_from`` function. This class, however,
-accomplishes it in a different way. The reason it exsts is that the dynamically
+accomplishes it in a different way. The reason it exists is that the dynamically
 generated ``QuerySet`` classes created by the ``manager_from`` function are
 not picklable. It's probably not often that a ``QuerySet`` is pickled, but
 it is a documented feature of the Django ``QuerySet`` class, and this method
@@ -408,7 +408,7 @@ so all that is required is that you change your custom managers to inherit from
 ``PassThroughManager`` instead of Django's built-in ``Manager`` class. Once you
 do this, create your custom ``QuerySet`` class, and have your manager's
 ``get_query_set`` method return instances of said class, then all of the
-methods you add to your custom ``QuerySet`` class will be avilable from your
+methods you add to your custom ``QuerySet`` class will be available from your
 manager as well::
 
     from datetime import datetime
@@ -475,3 +475,4 @@ it will automatically use that class when creating querysets for the manager::
     Post.objects.by_author(user=request.user).unpublished()
 
 .. _contributed by Paul McLanahan: http://paulm.us/post/3717466639/passthroughmanager-for-django
+

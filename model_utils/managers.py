@@ -2,16 +2,16 @@ from types import ClassType
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.db.models.fields.related import SingleRelatedObjectDescriptor
+from django.db.models.fields.related import OneToOneField
 from django.db.models.manager import Manager
 from django.db.models.query import QuerySet
 
 class InheritanceQuerySet(QuerySet):
     def select_subclasses(self, *subclasses):
         if not subclasses:
-            subclasses = [o for o in dir(self.model)
-                          if isinstance(getattr(self.model, o), SingleRelatedObjectDescriptor)
-                          and issubclass(getattr(self.model,o).related.model, self.model)]
+            subclasses = [rel.var_name for rel in self.model._meta.get_all_related_objects()
+                          if isinstance(rel.field, OneToOneField)
+                          and issubclass(rel.field.model, self.model)]
         new_qs = self.select_related(*subclasses)
         new_qs.subclasses = subclasses
         return new_qs
@@ -82,35 +82,36 @@ class QueryManager(models.Manager):
 
 
 class PassThroughManager(models.Manager):
-    '''
+    """
     Inherit from this Manager to enable you to call any methods from your
     custom QuerySet class from your manager. Simply define your QuerySet
     class, and return an instance of it from your manager's `get_query_set`
     method.
-    
+
     Alternately, if you don't need any extra methods on your manager that
     aren't on your QuerySet, then just pass your QuerySet class to this
     class' constructer.
-    
+
     class PostQuerySet(QuerySet):
         def enabled(self):
             return self.filter(disabled=False)
-    
+
     class Post(models.Model):
         objects = PassThroughManager(PostQuerySet)
-    '''
+
+    """
     # pickling causes recursion errors
     _deny_methods = ['__getstate__', '__setstate__', '_db']
-    
+
     def __init__(self, queryset_cls=None):
         self._queryset_cls = queryset_cls
         super(PassThroughManager, self).__init__()
-    
+
     def __getattr__(self, name):
         if name in self._deny_methods:
             raise AttributeError(name)
         return getattr(self.get_query_set(), name)
-    
+
     def get_query_set(self):
         if self._queryset_cls is not None:
             kargs = {'model': self.model}
@@ -121,7 +122,7 @@ class PassThroughManager(models.Manager):
 
 
 def manager_from(*mixins, **kwds):
-    '''
+    """
     Returns a Manager instance with extra methods, also available and
     chainable on generated querysets.
 
@@ -137,7 +138,8 @@ def manager_from(*mixins, **kwds):
 
     :keyword manager_cls: The base manager class to extend from
         (``django.db.models.manager.Manager`` by default).
-    '''
+
+    """
     # collect separately the mixin classes and methods
     bases = [kwds.get('queryset_cls', QuerySet)]
     methods = {}

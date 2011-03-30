@@ -5,6 +5,7 @@ except ImportError:
 
 from datetime import datetime, timedelta
 
+import django
 from django.test import TestCase
 from django.conf import settings
 from django.db import models
@@ -13,7 +14,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django.contrib.contenttypes.models import ContentType
 
-from model_utils import ChoiceEnum, Choices
+from model_utils import Choices
 from model_utils.fields import get_excerpt, MonitorField
 from model_utils.managers import QueryManager, manager_from
 from model_utils.models import StatusModel, TimeFramedModel
@@ -251,26 +252,30 @@ class InheritanceCastQuerysetTests(TestCase):
                           set([parent, self.child, self.child2]))
 
 
-class InheritanceManagerTests(TestCase):
-    def setUp(self):
-        self.child1 = InheritanceManagerTestChild1.objects.create()
-        self.child2 = InheritanceManagerTestChild2.objects.create()
+if django.VERSION >= (1, 2):
+    class InheritanceManagerTests(TestCase):
+        def setUp(self):
+            self.child1 = InheritanceManagerTestChild1.objects.create()
+            self.child2 = InheritanceManagerTestChild2.objects.create()
 
-    def test_normal(self):
-        self.assertEquals(set(InheritanceManagerTestParent.objects.all()),
-                          set([
-                    InheritanceManagerTestParent(pk=self.child1.pk),
-                    InheritanceManagerTestParent(pk=self.child2.pk),
-                    ]))
+        def test_normal(self):
+            self.assertEquals(set(InheritanceManagerTestParent.objects.all()),
+                              set([
+                        InheritanceManagerTestParent(pk=self.child1.pk),
+                        InheritanceManagerTestParent(pk=self.child2.pk),
+                        ]))
 
-    def test_select_all_subclasses(self):
-        self.assertEquals(set(InheritanceManagerTestParent.objects.select_subclasses()),
-                          set([self.child1, self.child2]))
+        def test_select_all_subclasses(self):
+            self.assertEquals(
+                set(InheritanceManagerTestParent.objects.select_subclasses()),
+                set([self.child1, self.child2]))
 
-    def test_select_specific_subclasses(self):
-        self.assertEquals(set(InheritanceManagerTestParent.objects.select_subclasses(
-                    "inheritancemanagertestchild1")),
-                          set([self.child1, InheritanceManagerTestParent(pk=self.child2.pk)]))
+        def test_select_specific_subclasses(self):
+            self.assertEquals(
+                set(InheritanceManagerTestParent.objects.select_subclasses(
+                        "inheritancemanagertestchild1")),
+                set([self.child1,
+                     InheritanceManagerTestParent(pk=self.child2.pk)]))
 
 
 class TimeStampedModelTests(TestCase):
@@ -435,7 +440,7 @@ class ManagerFromTests(TestCase):
 
     def test_cant_reconcile_qs_class(self):
         self.assertRaises(TypeError, Entry.broken.all)
-    
+
     def test_queryset_pickling_fails(self):
         qs = Entry.objects.all()
         def dump_load():
@@ -456,14 +461,14 @@ class PassThroughManagerTests(TestCase):
         self.assertEqual(Dude.objects.all().by_name('Duder').count(), 1)
         self.assertEqual(Dude.abiders.rug_positive().count(), 1)
         self.assertEqual(Dude.abiders.all().rug_positive().count(), 1)
-    
+
     def test_manager_only_methods(self):
         stats = Dude.abiders.get_stats()
         self.assertEqual(stats['rug_count'], 1)
         def notonqs():
             Dude.abiders.all().get_stats()
         self.assertRaises(AttributeError, notonqs)
-    
+
     def test_queryset_pickling(self):
         qs = Dude.objects.all()
         saltyqs = pickle.dumps(qs)
