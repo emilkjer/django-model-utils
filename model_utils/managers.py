@@ -33,7 +33,16 @@ class InheritanceQuerySet(QuerySet):
         iter = super(InheritanceQuerySet, self).iterator()
         if getattr(self, 'subclasses', False):
             for obj in iter:
-                sub_obj = [getattr(obj, s) for s in self.subclasses if getattr(obj, s)] or [obj]
+                #FIX From https://bitbucket.org/carljm/django-model-utils/pull-request/5/patch-to-issue-16/diff
+                #FIX START
+                # sub_obj = [getattr(obj, s) for s in self.subclasses if getattr(obj, s)] or [obj]
+                def get_attr(obj, s):
+                    try:
+                        return getattr(obj,s.lower())
+                    except ObjectDoesNotExist:
+                        return None
+                sub_obj = [getattr(obj, s) for s in self.subclasses if get_attr(obj, s)] or [obj]
+                #FIX END
                 sub_obj = sub_obj[0]
                 if getattr(self, '_annotated', False):
                     for k in self._annotated:
