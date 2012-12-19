@@ -6,6 +6,8 @@ from django.db import models
 from django.db.models.fields.related import OneToOneField
 from django.db.models.manager import Manager
 from django.db.models.query import QuerySet
+#FIX BY EMIL
+from django.core.exceptions import ObjectDoesNotExist
 
 
 class InheritanceQuerySet(QuerySet):
