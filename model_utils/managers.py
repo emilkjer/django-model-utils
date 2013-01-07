@@ -6,9 +6,8 @@ from django.db import models
 from django.db.models.fields.related import OneToOneField
 from django.db.models.manager import Manager
 from django.db.models.query import QuerySet
-#FIX BY EMIL
-from django.core.exceptions import ObjectDoesNotExist
 
+import django
 
 class InheritanceQuerySet(QuerySet):
     def select_subclasses(self, *subclasses):
@@ -31,21 +30,28 @@ class InheritanceQuerySet(QuerySet):
         qset._annotated = [a.default_alias for a in args] + kwargs.keys()
         return qset
 
+    def get_subclass(self, obj):
+        """
+        FIX see https://bitbucket.org/carljm/django-model-utils/pull-request/5/patch-to-issue-16/diff
+        and https://bitbucket.org/carljm/django-model-utils/issue/15/mti-problem-with-select_subclasses
+        """
+        def get_attribute(obj, s):
+            try:
+                return getattr(obj,s, False)
+            except obj.__class__.DoesNotExist:
+                return False
+                
+        if django.VERSION[0:2] < (1, 5):
+            sub_obj = [getattr(obj, s) for s in self.subclasses if getattr(obj, s)] or [obj]
+        else:
+            sub_obj = [getattr(obj, s) for s in self.subclasses if get_attribute(obj, s)] or [obj]
+        return sub_obj[0]
+
     def iterator(self):
         iter = super(InheritanceQuerySet, self).iterator()
         if getattr(self, 'subclasses', False):
             for obj in iter:
-                #FIX From https://bitbucket.org/carljm/django-model-utils/pull-request/5/patch-to-issue-16/diff
-                #FIX START
-                # sub_obj = [getattr(obj, s) for s in self.subclasses if getattr(obj, s)] or [obj]
-                def get_attr(obj, s):
-                    try:
-                        return getattr(obj,s.lower())
-                    except ObjectDoesNotExist:
-                        return None
-                sub_obj = [getattr(obj, s) for s in self.subclasses if get_attr(obj, s)] or [obj]
-                #FIX END
-                sub_obj = sub_obj[0]
+                sub_obj = self.get_subclass(obj)
                 if getattr(self, '_annotated', False):
                     for k in self._annotated:
                         setattr(sub_obj, k, getattr(obj, k))
